@@ -124,21 +124,13 @@ def load_data():
     test = pd.read_csv("files/input/test_data.csv.zip")
 
     for df in [train, test]:
-
-        df.rename(
-            columns={"default payment next month": "default"},
-            inplace=True,
-        )
-
-        if "ID" in df.columns:
-            df.drop(columns=["ID"], inplace=True)
-
-        df = df[(df["EDUCATION"] != 0)]
-        df = df[(df["MARRIAGE"] != 0)]
-
-        df["EDUCATION"] = df["EDUCATION"].apply(
-           lambda x: 4 if x > 4 else x
-        )
+     df.drop(
+        df[
+            (df["EDUCATION"] == 0) |
+            (df["MARRIAGE"] == 0)
+        ].index,
+        inplace=True
+     )
 
     return train, test
 
@@ -268,7 +260,7 @@ def pregunta_01():
     )
 
     param_grid = {
-      "selectkbest__k": list(range(1, 24)),
+      "selectkbest__k": list(range(1, 34)),
       "classifier__C": [0.01, 0.1, 1, 10, 100],
     }
 
@@ -281,6 +273,10 @@ def pregunta_01():
     )
 
     grid_search.fit(X_train, y_train)
+    print(grid_search.best_params_)
+    print(grid_search.best_score_)
+    print("BEST PARAMS:", grid_search.best_params_)
+    print("BEST SCORE:", grid_search.best_score_)
 
     save_model(grid_search)
 
