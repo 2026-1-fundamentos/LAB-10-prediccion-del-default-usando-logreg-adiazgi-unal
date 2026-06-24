@@ -283,8 +283,8 @@ def pregunta_01():
 
     save_model(grid_search)
 
-    y_train_pred = best_model.predict(X_train)
-    y_test_pred = best_model.predict(X_test)
+    y_train_pred = grid_search.predict(X_train)
+    y_test_pred = grid_search.predict(X_test)
 
     results = [
         metrics_dict(
