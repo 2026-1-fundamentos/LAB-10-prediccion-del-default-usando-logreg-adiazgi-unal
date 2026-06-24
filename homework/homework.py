@@ -95,3 +95,221 @@
 # {'type': 'cm_matrix', 'dataset': 'train', 'true_0': {"predicted_0": 15562, "predicte_1": 666}, 'true_1': {"predicted_0": 3333, "predicted_1": 1444}}
 # {'type': 'cm_matrix', 'dataset': 'test', 'true_0': {"predicted_0": 15562, "predicte_1": 650}, 'true_1': {"predicted_0": 2490, "predicted_1": 1420}}
 #
+# flake8: noqa: E501
+
+import gzip
+import json
+import os
+import pickle
+
+import pandas as pd
+
+from sklearn.compose import ColumnTransformer
+from sklearn.feature_selection import SelectKBest, f_classif
+from sklearn.linear_model import LogisticRegression
+from sklearn.metrics import (
+    balanced_accuracy_score,
+    confusion_matrix,
+    f1_score,
+    precision_score,
+    recall_score,
+)
+from sklearn.model_selection import GridSearchCV
+from sklearn.pipeline import Pipeline
+from sklearn.preprocessing import MinMaxScaler, OneHotEncoder
+
+
+def load_data():
+    train = pd.read_csv("files/input/train_data.csv.zip")
+    test = pd.read_csv("files/input/test_data.csv.zip")
+
+    for df in [train, test]:
+
+        df.rename(
+            columns={"default payment next month": "default"},
+            inplace=True,
+        )
+
+        if "ID" in df.columns:
+            df.drop(columns=["ID"], inplace=True)
+
+        df.dropna(inplace=True)
+
+        df["EDUCATION"] = df["EDUCATION"].apply(
+            lambda x: 4 if x > 4 else x
+        )
+
+    return train, test
+
+
+def build_pipeline(categorical_cols, numerical_cols):
+
+    preprocessor = ColumnTransformer(
+        transformers=[
+            (
+                "cat",
+                OneHotEncoder(handle_unknown="ignore"),
+                categorical_cols,
+            ),
+            (
+                "num",
+                MinMaxScaler(),
+                numerical_cols,
+            ),
+        ]
+    )
+
+    pipeline = Pipeline(
+        steps=[
+            ("preprocessor", preprocessor),
+            ("selectkbest", SelectKBest(score_func=f_classif)),
+            (
+                "classifier",
+                LogisticRegression(
+                    max_iter=1000,
+                    random_state=42,
+                ),
+            ),
+        ]
+    )
+
+    return pipeline
+
+
+def save_model(model):
+
+    os.makedirs("files/models", exist_ok=True)
+
+    with gzip.open(
+        "files/models/model.pkl.gz",
+        "wb",
+    ) as file:
+        pickle.dump(model, file)
+
+
+def metrics_dict(y_true, y_pred, dataset):
+
+    return {
+        "type": "metrics",
+        "dataset": dataset,
+        "precision": float(
+            precision_score(y_true, y_pred)
+        ),
+        "balanced_accuracy": float(
+            balanced_accuracy_score(y_true, y_pred)
+        ),
+        "recall": float(
+            recall_score(y_true, y_pred)
+        ),
+        "f1_score": float(
+            f1_score(y_true, y_pred)
+        ),
+    }
+
+
+def confusion_dict(y_true, y_pred, dataset):
+
+    cm = confusion_matrix(y_true, y_pred)
+
+    return {
+        "type": "cm_matrix",
+        "dataset": dataset,
+        "true_0": {
+            "predicted_0": int(cm[0, 0]),
+            "predicted_1": int(cm[0, 1]),
+        },
+        "true_1": {
+            "predicted_0": int(cm[1, 0]),
+            "predicted_1": int(cm[1, 1]),
+        },
+    }
+
+
+def save_metrics(results):
+
+    os.makedirs("files/output", exist_ok=True)
+
+    with open(
+        "files/output/metrics.json",
+        "w",
+        encoding="utf-8",
+    ) as file:
+        for item in results:
+            file.write(json.dumps(item))
+            file.write("\n")
+
+
+def pregunta_01():
+
+    train, test = load_data()
+
+    X_train = train.drop(columns=["default"])
+    y_train = train["default"]
+
+    X_test = test.drop(columns=["default"])
+    y_test = test["default"]
+
+    categorical_cols = [
+        "SEX",
+        "EDUCATION",
+        "MARRIAGE",
+    ]
+
+    numerical_cols = [
+        col
+        for col in X_train.columns
+        if col not in categorical_cols
+    ]
+
+    pipeline = build_pipeline(
+        categorical_cols,
+        numerical_cols,
+    )
+
+    param_grid = {
+        "selectkbest__k": [5, 10, 15, 20],
+        "classifier__C": [0.01, 0.1, 1.0, 10.0],
+    }
+
+    grid_search = GridSearchCV(
+        pipeline,
+        param_grid=param_grid,
+        scoring="balanced_accuracy",
+        cv=10,
+        n_jobs=1,
+    )
+
+    grid_search.fit(X_train, y_train)
+
+    save_model(grid_search)
+
+    y_train_pred = best_model.predict(X_train)
+    y_test_pred = best_model.predict(X_test)
+
+    results = [
+        metrics_dict(
+            y_train,
+            y_train_pred,
+            "train",
+        ),
+        metrics_dict(
+            y_test,
+            y_test_pred,
+            "test",
+        ),
+        confusion_dict(
+            y_train,
+            y_train_pred,
+            "train",
+        ),
+        confusion_dict(
+            y_test,
+            y_test_pred,
+            "test",
+        ),
+    ]
+
+    save_metrics(results)
+
+if __name__ == "__main__":
+       pregunta_01()
