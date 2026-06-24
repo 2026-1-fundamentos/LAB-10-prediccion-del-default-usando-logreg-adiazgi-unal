@@ -120,19 +120,34 @@ from sklearn.preprocessing import MinMaxScaler, OneHotEncoder
 
 
 def load_data():
+
     train = pd.read_csv("files/input/train_data.csv.zip")
     test = pd.read_csv("files/input/test_data.csv.zip")
 
     for df in [train, test]:
-     df.drop(
-        df[
-            (df["EDUCATION"] == 0) |
-            (df["MARRIAGE"] == 0)
-        ].index,
-        inplace=True
-     )
+
+        df.rename(
+            columns={"default payment next month": "default"},
+            inplace=True,
+        )
+
+        if "ID" in df.columns:
+            df.drop(columns=["ID"], inplace=True)
+
+        df.drop(
+            df[
+                (df["EDUCATION"] == 0)
+                | (df["MARRIAGE"] == 0)
+            ].index,
+            inplace=True,
+        )
+
+        df["EDUCATION"] = df["EDUCATION"].apply(
+            lambda x: 4 if x > 4 else x
+        )
 
     return train, test
+    
 
 
 def build_pipeline(categorical_cols, numerical_cols):
@@ -261,7 +276,15 @@ def pregunta_01():
 
     param_grid = {
       "selectkbest__k": list(range(1, 34)),
-      "classifier__C": [0.01, 0.1, 1, 10, 100],
+      "classifier__C": [
+        0.001,
+        0.01,
+        0.1,
+        1,
+        10,
+        100,
+       1000,
+       ],
     }
 
     grid_search = GridSearchCV(
