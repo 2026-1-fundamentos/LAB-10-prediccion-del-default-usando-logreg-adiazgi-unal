@@ -275,7 +275,7 @@ def pregunta_01():
     )
 
     param_grid = {
-      "selectkbest__k": list(range(1, 34)),
+      "selectkbest__k": list(range(1, 30)),
       "classifier__C": [
         0.001,
         0.01,
